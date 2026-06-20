@@ -1,0 +1,35 @@
+name: Beitar Jerusalem Match Day Alert
+
+on:
+  schedule:
+    # Both cover ~08:00 Israel time year-round (handles IST/IDT switch).
+    - cron: '0,30 5 * * *'   # 08:00 IDT (summer, UTC+3)
+    - cron: '0,30 6 * * *'   # 08:00 IST (winter, UTC+2)
+  workflow_dispatch: {}   # lets you trigger a manual test run from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run football alert check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python football_alert.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "football-alert-bot"
+          git config user.email "actions@github.com"
+          git add football_state.json
+          git diff --staged --quiet || git commit -m "update football state [skip ci]"
+          git push

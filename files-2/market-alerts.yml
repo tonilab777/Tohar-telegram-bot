@@ -1,0 +1,36 @@
+name: Market Alerts
+
+on:
+  schedule:
+    # Times are UTC. Together these cover ~03:00-21:00 New York time
+    # (handles both EST and EDT) with a 10-minute check interval.
+    - cron: '*/10 7-23 * * *'
+    - cron: '*/10 0-1 * * *'
+  workflow_dispatch: {}   # lets you trigger a manual test run from the Actions tab
+
+permissions:
+  contents: write   # needed so the workflow can commit the updated state.json
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run market alert check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python market_alert.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "market-alert-bot"
+          git config user.email "actions@github.com"
+          git add state.json
+          git diff --staged --quiet || git commit -m "update state [skip ci]"
+          git push
